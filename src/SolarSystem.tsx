@@ -21,7 +21,6 @@ function glowTexture(color = '#ffffff') {
 
 export default function SolarSystem({ active, onSelect, onSkill }: Props) {
   const host = useRef<HTMLDivElement>(null)
-  const tip = useRef<HTMLDivElement>(null)
   const activeRef = useRef(active)
   const callbacks = useRef({ onSelect, onSkill })
   callbacks.current = { onSelect, onSkill }
@@ -60,6 +59,7 @@ export default function SolarSystem({ active, onSelect, onSkill }: Props) {
     const moonTexture = loadTexture('/textures/moon.jpg')
     const earthCloudTexture = loadTexture('/textures/earth-clouds.jpg')
     const saturnRingTexture = loadTexture('/textures/saturn-ring.png')
+    const starFieldTexture = loadTexture('/textures/stars.jpg')
 
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
@@ -91,10 +91,6 @@ export default function SolarSystem({ active, onSelect, onSkill }: Props) {
     const corona = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture('#ff9e32'), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }))
     corona.scale.set(6.4, 6.4, 1)
     scene.add(corona)
-    const solarHalo = new THREE.Mesh(new THREE.RingGeometry(1.45, 1.78, 96), new THREE.MeshBasicMaterial({ color: 0xffbd62, transparent: true, opacity: .08, side: THREE.DoubleSide }))
-    solarHalo.rotation.x = -Math.PI / 2
-    scene.add(solarHalo)
-
     sections.forEach((section) => {
       const curve = new THREE.EllipseCurve(0, 0, section.radius, section.radius * .72, 0, Math.PI * 2)
       const orbitPoints = curve.getPoints(180).map((p) => new THREE.Vector3(p.x, 0, p.y))
@@ -151,10 +147,10 @@ export default function SolarSystem({ active, onSelect, onSkill }: Props) {
     const skillSprites: THREE.Sprite[] = []
     skills.forEach(([name, color, index]) => {
       const angle = index * 2.39996
-      const radius = 14.5 + (index % 4) * 2.2
+      const radius = 5.2 + ((index * 3) % 8) * 1.12
       const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(color), transparent: true, opacity: .46, blending: THREE.AdditiveBlending, depthWrite: false }))
-      sprite.position.set(Math.cos(angle) * radius, ((index % 5) - 2) * 1.8, Math.sin(angle) * radius)
-      const size = index % 3 === 0 ? .55 : .38
+      sprite.position.set(Math.cos(angle) * radius, ((index * 2) % 7 - 3) * .82, Math.sin(angle) * radius)
+      const size = index % 3 === 0 ? .62 : .43
       sprite.scale.set(size, size, 1)
       sprite.userData = { kind: 'skill', name, label: `技能 · ${name}` }
       scene.add(sprite)
@@ -162,8 +158,14 @@ export default function SolarSystem({ active, onSelect, onSkill }: Props) {
       skillSprites.push(sprite)
     })
 
-    const count = 1750
+    const sky = new THREE.Mesh(new THREE.SphereGeometry(110, 48, 32), new THREE.MeshBasicMaterial({ map: starFieldTexture, side: THREE.BackSide, transparent: true, opacity: .72, depthWrite: false }))
+    sky.rotation.y = .7
+    scene.add(sky)
+
+    const count = 2100
     const positions = new Float32Array(count * 3)
+    const colors = new Float32Array(count * 3)
+    const starPalette = [new THREE.Color(0xc9d9ff), new THREE.Color(0xffffff), new THREE.Color(0xffe2bb), new THREE.Color(0x9fc5ff)]
     for (let i = 0; i < count; i++) {
       const radius = 28 + Math.random() * 80
       const angle = Math.random() * Math.PI * 2
@@ -171,15 +173,38 @@ export default function SolarSystem({ active, onSelect, onSkill }: Props) {
       positions[i * 3] = Math.cos(angle) * Math.sqrt(1 - unit * unit) * radius
       positions[i * 3 + 1] = unit * radius * .58
       positions[i * 3 + 2] = Math.sin(angle) * Math.sqrt(1 - unit * unit) * radius
+      const color = starPalette[i % starPalette.length]
+      colors[i * 3] = color.r
+      colors[i * 3 + 1] = color.g
+      colors[i * 3 + 2] = color.b
     }
     const starGeo = new THREE.BufferGeometry()
     starGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xcbd9f4, size: .05, transparent: true, opacity: .72, depthWrite: false }))
+    starGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+    const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ map: glowTexture('#ffffff'), size: .075, transparent: true, opacity: .62, depthWrite: false, vertexColors: true, blending: THREE.AdditiveBlending, alphaTest: .03 }))
     scene.add(stars)
+
+    const brightCount = 150
+    const brightPositions = new Float32Array(brightCount * 3)
+    const brightColors = new Float32Array(brightCount * 3)
+    for (let i = 0; i < brightCount; i++) {
+      const radius = 24 + Math.random() * 66
+      const angle = Math.random() * Math.PI * 2
+      const unit = Math.random() * 2 - 1
+      brightPositions[i * 3] = Math.cos(angle) * Math.sqrt(1 - unit * unit) * radius
+      brightPositions[i * 3 + 1] = unit * radius * .62
+      brightPositions[i * 3 + 2] = Math.sin(angle) * Math.sqrt(1 - unit * unit) * radius
+      const color = starPalette[(i * 3) % starPalette.length]
+      brightColors[i * 3] = color.r; brightColors[i * 3 + 1] = color.g; brightColors[i * 3 + 2] = color.b
+    }
+    const brightGeo = new THREE.BufferGeometry()
+    brightGeo.setAttribute('position', new THREE.BufferAttribute(brightPositions, 3))
+    brightGeo.setAttribute('color', new THREE.BufferAttribute(brightColors, 3))
+    const brightStars = new THREE.Points(brightGeo, new THREE.PointsMaterial({ map: glowTexture('#ffffff'), size: .24, transparent: true, opacity: .7, depthWrite: false, vertexColors: true, blending: THREE.AdditiveBlending, alphaTest: .025 }))
+    scene.add(brightStars)
 
     const raycaster = new THREE.Raycaster()
     const pointer = new THREE.Vector2()
-    let pointerDown = { x: 0, y: 0 }
     let hovered: THREE.Object3D | undefined
     let lastActive = 'profile'
     let focusAmount = 1
@@ -189,34 +214,47 @@ export default function SolarSystem({ active, onSelect, onSkill }: Props) {
     const desiredCamera = new THREE.Vector3()
     const previousTarget = new THREE.Vector3()
 
-    const pick = (event: PointerEvent) => {
+    const pick = (event: PointerEvent | MouseEvent) => {
       const rect = renderer.domElement.getBoundingClientRect()
       pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1)
       raycaster.setFromCamera(pointer, camera)
-      return raycaster.intersectObjects(clickable, false)[0]?.object
+      const hit = raycaster.intersectObjects(clickable, false)[0]?.object
+      if (hit) return hit
+      let nearest: THREE.Object3D | undefined
+      let nearestDistance = Infinity
+      const world = new THREE.Vector3()
+      const projected = new THREE.Vector3()
+      clickable.forEach((object) => {
+        object.getWorldPosition(world)
+        projected.copy(world).project(camera)
+        if (projected.z < -1 || projected.z > 1) return
+        const screenX = rect.left + (projected.x + 1) * rect.width / 2
+        const screenY = rect.top + (1 - projected.y) * rect.height / 2
+        const distance = Math.hypot(event.clientX - screenX, event.clientY - screenY)
+        const radius = object.userData.id === 'profile' ? 68 : object.userData.kind === 'skill' ? 16 : 24
+        if (distance < radius && distance < nearestDistance) { nearest = object; nearestDistance = distance }
+      })
+      return nearest
     }
     const onMove = (event: PointerEvent) => {
-      if (event.buttons) { if (tip.current) tip.current.hidden = true; return }
+      if (event.buttons) return
       hovered = pick(event)
       renderer.domElement.style.cursor = hovered ? 'pointer' : 'grab'
-      if (!tip.current) return
-      if (!hovered) { tip.current.hidden = true; return }
-      const rect = mount.getBoundingClientRect()
-      tip.current.hidden = false
-      tip.current.textContent = hovered.userData.label
-      tip.current.style.transform = `translate(${event.clientX - rect.left + 14}px, ${event.clientY - rect.top + 14}px)`
-    }
-    const onDown = (event: PointerEvent) => { pointerDown = { x: event.clientX, y: event.clientY }; renderer.domElement.style.cursor = 'grabbing' }
-    const onUp = (event: PointerEvent) => {
-      renderer.domElement.style.cursor = hovered ? 'pointer' : 'grab'
-      if (Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y) > 5) return
-      const selected = pick(event)
-      if (selected?.userData.kind === 'section') callbacks.current.onSelect(selected.userData.id)
-      if (selected?.userData.kind === 'skill') callbacks.current.onSkill(selected.userData.name)
     }
     renderer.domElement.addEventListener('pointermove', onMove)
-    renderer.domElement.addEventListener('pointerdown', onDown)
-    renderer.domElement.addEventListener('pointerup', onUp)
+
+    const hitTargets = clickable.map((object) => {
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.className = 'celestial-hit'
+      button.setAttribute('aria-label', `查看${object.userData.label}`)
+      button.addEventListener('click', () => {
+        if (object.userData.kind === 'section') callbacks.current.onSelect(object.userData.id)
+        if (object.userData.kind === 'skill') callbacks.current.onSkill(object.userData.name)
+      })
+      mount.appendChild(button)
+      return { object, button }
+    })
 
     const onResize = () => {
       camera.aspect = mount.clientWidth / mount.clientHeight
@@ -233,7 +271,7 @@ export default function SolarSystem({ active, onSelect, onSkill }: Props) {
       elapsed += Math.min((now - lastFrame) / 1000, .05)
       lastFrame = now
       orbiters.forEach((orbiter, index) => {
-        if (!reducedMotion && activeRef.current === 'profile') orbiter.pivot.rotation.y = orbiter.base + elapsed * orbiter.speed * .17
+        if (!reducedMotion && activeRef.current === 'overview') orbiter.pivot.rotation.y = orbiter.base + elapsed * orbiter.speed * .17
         orbiter.planet.rotation.y += .0025 + index * .0001
         const clouds = orbiter.planet.parent?.children.find((child) => child.userData.cloudLayer)
         if (clouds) clouds.rotation.y += .0031
@@ -241,6 +279,8 @@ export default function SolarSystem({ active, onSelect, onSkill }: Props) {
       if (!reducedMotion) {
         corona.material.rotation = elapsed * .03
         stars.rotation.y = elapsed * .002
+        brightStars.rotation.y = -elapsed * .0012
+        sky.rotation.y += .000015
         skillSprites.forEach((sprite, index) => { sprite.material.opacity = .34 + Math.sin(elapsed * 1.2 + index) * .12 })
       }
 
@@ -255,7 +295,7 @@ export default function SolarSystem({ active, onSelect, onSkill }: Props) {
       const selectedObject = objects.get(selectedId) || sun
       selectedObject.getWorldPosition(desiredTarget)
       const section = sections.find((item) => item.id === selectedId)
-      const distance = selectedId === 'profile' ? 22 : Math.max(2.1, (section?.size || .4) * 5.2)
+      const distance = selectedId === 'overview' ? 22 : selectedId === 'profile' ? 4.4 : Math.max(2.1, (section?.size || .4) * 5.2)
       desiredCamera.copy(desiredTarget).addScaledVector(new THREE.Vector3(.72, .42, 1).normalize(), distance)
 
       if (focusAmount < 1) {
@@ -271,6 +311,19 @@ export default function SolarSystem({ active, onSelect, onSkill }: Props) {
         previousTarget.copy(desiredTarget)
       }
       controls.update()
+      const hitWorld = new THREE.Vector3()
+      const hitProjected = new THREE.Vector3()
+      hitTargets.forEach(({ object, button }) => {
+        object.getWorldPosition(hitWorld)
+        hitProjected.copy(hitWorld).project(camera)
+        const visible = hitProjected.z >= -1 && hitProjected.z <= 1
+        button.hidden = !visible
+        if (!visible) return
+        const size = object.userData.id === 'profile' ? 86 : object.userData.kind === 'skill' ? 22 : 38
+        button.style.width = `${size}px`
+        button.style.height = `${size}px`
+        button.style.transform = `translate(${(hitProjected.x + 1) * mount.clientWidth / 2 - size / 2}px, ${(1 - hitProjected.y) * mount.clientHeight / 2 - size / 2}px)`
+      })
       renderer.render(scene, camera)
       raf = requestAnimationFrame(animate)
     }
@@ -281,12 +334,11 @@ export default function SolarSystem({ active, onSelect, onSkill }: Props) {
       controls.dispose()
       window.removeEventListener('resize', onResize)
       renderer.domElement.removeEventListener('pointermove', onMove)
-      renderer.domElement.removeEventListener('pointerdown', onDown)
-      renderer.domElement.removeEventListener('pointerup', onUp)
+      hitTargets.forEach(({ button }) => button.remove())
       renderer.dispose()
       renderer.domElement.remove()
     }
   }, [])
 
-  return <div className="solar-system" ref={host} aria-label="可旋转和缩放的个人太阳系"><div className="celestial-tip" ref={tip} hidden /></div>
+  return <div className="solar-system" ref={host} aria-label="可旋转和缩放的个人太阳系" />
 }
