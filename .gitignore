@@ -4,5 +4,6 @@ dist
 *.log
 *.tsbuildinfo
 desktop.png
+desktop-focus.png
 mobile-home.png
 mobile-projects.png
