@@ -5,5 +5,7 @@ dist
 *.tsbuildinfo
 desktop.png
 desktop-focus.png
+jupiter.png
+saturn.png
 mobile-home.png
 mobile-projects.png

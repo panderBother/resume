@@ -44,6 +44,23 @@ export default function SolarSystem({ active, onSelect, onSkill }: Props) {
     renderer.toneMappingExposure = 1.05
     mount.prepend(renderer.domElement)
 
+    const textureLoader = new THREE.TextureLoader()
+    const textureFiles: Record<string, string> = {
+      profile: '/textures/sun.jpg', internship: '/textures/mercury.jpg', work: '/textures/venus.jpg',
+      projects: '/textures/earth.jpg', education: '/textures/mars.jpg', opensource: '/textures/jupiter.jpg',
+      strengths: '/textures/saturn.jpg', interests: '/textures/uranus.jpg',
+    }
+    const loadTexture = (url: string) => {
+      const texture = textureLoader.load(url)
+      texture.colorSpace = THREE.SRGBColorSpace
+      texture.anisotropy = renderer.capabilities.getMaxAnisotropy()
+      return texture
+    }
+    const surfaceTextures = Object.fromEntries(Object.entries(textureFiles).map(([id, url]) => [id, loadTexture(url)]))
+    const moonTexture = loadTexture('/textures/moon.jpg')
+    const earthCloudTexture = loadTexture('/textures/earth-clouds.jpg')
+    const saturnRingTexture = loadTexture('/textures/saturn-ring.png')
+
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
     controls.dampingFactor = .055
@@ -65,7 +82,7 @@ export default function SolarSystem({ active, onSelect, onSkill }: Props) {
     const objects = new Map<string, THREE.Object3D>()
     const orbiters: { pivot: THREE.Group; speed: number; planet: THREE.Mesh; base: number }[] = []
 
-    const sun = new THREE.Mesh(new THREE.SphereGeometry(1.26, 72, 72), new THREE.MeshBasicMaterial({ color: 0xffa52e }))
+    const sun = new THREE.Mesh(new THREE.SphereGeometry(1.26, 72, 72), new THREE.MeshBasicMaterial({ map: surfaceTextures.profile }))
     sun.userData = { kind: 'section', id: 'profile', label: '太阳 · 个人简介' }
     scene.add(sun)
     clickable.push(sun)
@@ -90,15 +107,33 @@ export default function SolarSystem({ active, onSelect, onSkill }: Props) {
       group.position.set(section.radius, 0, 0)
       pivot.add(group)
 
-      const planet = new THREE.Mesh(new THREE.SphereGeometry(section.size, 52, 52), new THREE.MeshStandardMaterial({ color: section.color, roughness: .76, metalness: .025, emissive: new THREE.Color(section.color), emissiveIntensity: .035 }))
+      const planet = new THREE.Mesh(new THREE.SphereGeometry(section.size, 64, 64), new THREE.MeshStandardMaterial({
+        map: surfaceTextures[section.id], roughness: section.id === 'projects' ? .67 : .82, metalness: 0,
+      }))
       planet.userData = { kind: 'section', id: section.id, label: `${section.planet} · ${section.label}` }
       group.add(planet)
       clickable.push(planet)
       objects.set(section.id, planet)
 
-      if (section.id === 'projects') group.add(new THREE.Mesh(new THREE.SphereGeometry(section.size * 1.075, 48, 48), new THREE.MeshBasicMaterial({ color: 0x68bfff, transparent: true, opacity: .1, side: THREE.BackSide })))
+      if (section.id === 'projects') {
+        group.add(new THREE.Mesh(new THREE.SphereGeometry(section.size * 1.075, 48, 48), new THREE.MeshBasicMaterial({ color: 0x68bfff, transparent: true, opacity: .1, side: THREE.BackSide })))
+        const clouds = new THREE.Mesh(new THREE.SphereGeometry(section.size * 1.018, 64, 64), new THREE.MeshStandardMaterial({
+          map: earthCloudTexture, alphaMap: earthCloudTexture, transparent: true, opacity: .72, depthWrite: false, roughness: 1,
+        }))
+        clouds.userData.cloudLayer = true
+        group.add(clouds)
+      }
       if (section.id === 'strengths') {
-        const ring = new THREE.Mesh(new THREE.RingGeometry(section.size * 1.35, section.size * 2.3, 96), new THREE.MeshBasicMaterial({ color: 0xdcc58b, transparent: true, opacity: .66, side: THREE.DoubleSide }))
+        const inner = section.size * 1.35
+        const outer = section.size * 2.45
+        const ringGeometry = new THREE.RingGeometry(inner, outer, 128, 8)
+        const position = ringGeometry.attributes.position
+        const uv = ringGeometry.attributes.uv
+        for (let i = 0; i < position.count; i++) {
+          const radius = Math.hypot(position.getX(i), position.getY(i))
+          uv.setXY(i, (radius - inner) / (outer - inner), .5)
+        }
+        const ring = new THREE.Mesh(ringGeometry, new THREE.MeshBasicMaterial({ map: saturnRingTexture, transparent: true, opacity: .92, side: THREE.DoubleSide, depthWrite: false }))
         ring.rotation.x = Math.PI / 2.35
         group.add(ring)
       }
@@ -106,7 +141,7 @@ export default function SolarSystem({ active, onSelect, onSkill }: Props) {
       if (section.id !== 'education') section.entries.forEach((_, index) => {
         const angle = (index / section.entries.length) * Math.PI * 2
         const moonRadius = section.size * 1.9 + .26 + index * .075
-        const moon = new THREE.Mesh(new THREE.SphereGeometry(.066, 16, 16), new THREE.MeshStandardMaterial({ color: 0xdde1e8, roughness: .86 }))
+        const moon = new THREE.Mesh(new THREE.SphereGeometry(.066, 18, 18), new THREE.MeshStandardMaterial({ map: moonTexture, roughness: .9 }))
         moon.position.set(Math.cos(angle) * moonRadius, Math.sin(angle * 1.7) * .12, Math.sin(angle) * moonRadius)
         group.add(moon)
       })
@@ -191,14 +226,17 @@ export default function SolarSystem({ active, onSelect, onSkill }: Props) {
     window.addEventListener('resize', onResize)
 
     const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
-    const clock = new THREE.Clock()
+    let lastFrame = performance.now()
     let elapsed = 0
     let raf = 0
-    const animate = () => {
-      elapsed += Math.min(clock.getDelta(), .05)
+    const animate = (now = performance.now()) => {
+      elapsed += Math.min((now - lastFrame) / 1000, .05)
+      lastFrame = now
       orbiters.forEach((orbiter, index) => {
         if (!reducedMotion && activeRef.current === 'profile') orbiter.pivot.rotation.y = orbiter.base + elapsed * orbiter.speed * .17
         orbiter.planet.rotation.y += .0025 + index * .0001
+        const clouds = orbiter.planet.parent?.children.find((child) => child.userData.cloudLayer)
+        if (clouds) clouds.rotation.y += .0031
       })
       if (!reducedMotion) {
         corona.material.rotation = elapsed * .03

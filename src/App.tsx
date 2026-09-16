@@ -32,6 +32,7 @@ export default function App() {
       <span><MousePointer2 size={15} />点击聚焦</span>
       <span><Minus size={13} /><Plus size={13} />滚轮缩放</span>
     </div>
+    <a className="texture-credit" href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noreferrer">PLANET TEXTURES · SOLAR SYSTEM SCOPE / CC BY 4.0</a>
 
     {section && <aside className="detail-panel" aria-live="polite">
       <button className="panel-close" onClick={() => select('profile')} aria-label="关闭详情并返回总览"><X size={18} /></button>
