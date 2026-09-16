@@ -1,0 +1,8 @@
+node_modules
+dist
+.sites-runtime
+*.log
+*.tsbuildinfo
+desktop.png
+mobile-home.png
+mobile-projects.png
