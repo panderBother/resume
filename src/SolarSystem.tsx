@@ -34,8 +34,9 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
 
     const scene = new THREE.Scene()
     scene.fog = new THREE.FogExp2(0x020409, .008)
-    const camera = new THREE.PerspectiveCamera(42, mount.clientWidth / mount.clientHeight, .08, 220)
-    camera.position.set(0, 12, 21)
+    const isMobileViewport = () => mount.clientWidth <= 700
+    const camera = new THREE.PerspectiveCamera(isMobileViewport() ? 47 : 42, mount.clientWidth / mount.clientHeight, .08, 220)
+    camera.position.set(0, isMobileViewport() ? 15 : 12, isMobileViewport() ? 26 : 21)
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' })
     renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7))
@@ -136,12 +137,19 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
         group.add(ring)
       }
 
-      if (section.id !== 'education') section.entries.forEach((_, index) => {
+      if (section.id !== 'education') section.entries.forEach((entry, index) => {
         const angle = (index / section.entries.length) * Math.PI * 2
         const moonRadius = section.size * 1.9 + .26 + index * .075
         const moon = new THREE.Mesh(new THREE.SphereGeometry(.066, 18, 18), new THREE.MeshStandardMaterial({ map: moonTexture, roughness: .9 }))
         moon.position.set(Math.cos(angle) * moonRadius, Math.sin(angle * 1.7) * .12, Math.sin(angle) * moonRadius)
+        const entryName = section.id === 'internship'
+          ? entry.org.split(' · ')[0]
+          : section.id === 'projects'
+            ? entry.role.split(' · ')[0]
+            : entry.role
+        moon.userData = { kind: 'entry', sectionId: section.id, label: entryName, category: section.label }
         group.add(moon)
+        clickable.push(moon)
       })
       orbiters.push({ pivot, speed: section.speed, planet, base: section.start })
     })
@@ -255,6 +263,9 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
       if (!interactiveRef.current) return
       tooltipTarget = object
       tooltip.querySelector('strong')!.textContent = object.userData.label
+      tooltip.querySelector('span')!.textContent = object.userData.kind === 'entry'
+        ? `卫星 · ${object.userData.category} · 点击查看`
+        : '点击查看'
       tooltip.classList.add('is-visible')
     }
     const hideTooltip = () => {
@@ -267,6 +278,7 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
       button.type = 'button'
       button.className = 'celestial-hit'
       button.setAttribute('aria-label', `查看${object.userData.label}`)
+      if (object.userData.kind === 'entry') button.classList.add('satellite-hit')
       button.addEventListener('pointerenter', () => showTooltip(object))
       button.addEventListener('pointerleave', hideTooltip)
       button.addEventListener('focus', () => showTooltip(object))
@@ -274,6 +286,7 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
       button.addEventListener('click', () => {
         hideTooltip()
         if (object.userData.kind === 'section') callbacks.current.onSelect(object.userData.id)
+        if (object.userData.kind === 'entry') callbacks.current.onSelect(object.userData.sectionId)
         if (object.userData.kind === 'skill') callbacks.current.onSkill(object.userData.name)
       })
       mount.appendChild(button)
@@ -282,12 +295,14 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
 
     const onResize = () => {
       camera.aspect = mount.clientWidth / mount.clientHeight
+      camera.fov = isMobileViewport() ? 47 : 42
       camera.updateProjectionMatrix()
       renderer.setSize(mount.clientWidth, mount.clientHeight)
     }
     window.addEventListener('resize', onResize)
 
     const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
+    const coarsePointer = matchMedia('(pointer: coarse)').matches
     let lastFrame = performance.now()
     let elapsed = 0
     let raf = 0
@@ -318,8 +333,13 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
       }
       const selectedObject = objects.get(selectedId) || sun
       selectedObject.getWorldPosition(desiredTarget)
+      if (isMobileViewport() && selectedId !== 'overview') desiredTarget.y -= 1.15
       const section = sections.find((item) => item.id === selectedId)
-      const distance = selectedId === 'overview' ? 22 : selectedId === 'profile' ? 4.4 : Math.max(2.1, (section?.size || .4) * 5.2)
+      const distance = selectedId === 'overview'
+        ? (isMobileViewport() ? 26 : 22)
+        : selectedId === 'profile'
+          ? (isMobileViewport() ? 5.8 : 4.4)
+          : Math.max(isMobileViewport() ? 3.2 : 2.1, (section?.size || .4) * (isMobileViewport() ? 6.6 : 5.2))
       desiredCamera.copy(desiredTarget).addScaledVector(new THREE.Vector3(.72, .42, 1).normalize(), distance)
 
       if (focusAmount < 1) {
@@ -343,7 +363,13 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
         const visible = hitProjected.z >= -1 && hitProjected.z <= 1
         button.hidden = !visible || !interactiveRef.current
         if (!visible) return
-        const size = object.userData.id === 'profile' ? 86 : object.userData.kind === 'skill' ? 22 : 38
+        const size = object.userData.id === 'profile'
+          ? (coarsePointer ? 104 : 86)
+          : object.userData.kind === 'skill'
+            ? (coarsePointer ? 38 : 22)
+            : object.userData.kind === 'entry'
+              ? (coarsePointer ? 46 : 30)
+              : (coarsePointer ? 54 : 38)
         button.style.width = `${size}px`
         button.style.height = `${size}px`
         button.style.transform = `translate(${(hitProjected.x + 1) * mount.clientWidth / 2 - size / 2}px, ${(1 - hitProjected.y) * mount.clientHeight / 2 - size / 2}px)`
