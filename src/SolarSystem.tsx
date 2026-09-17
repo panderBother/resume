@@ -46,9 +46,10 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
     mount.prepend(renderer.domElement)
 
     const textureLoader = new THREE.TextureLoader()
+    const asset = (path: string) => `${import.meta.env.BASE_URL}${path}`
     const textureFiles: Record<string, string> = {
-      profile: '/textures/sun.jpg', internship: '/textures/mercury.jpg', projects: '/textures/earth.jpg',
-      education: '/textures/mars.jpg', strengths: '/textures/saturn.jpg',
+      profile: asset('textures/sun.jpg'), internship: asset('textures/mercury.jpg'), projects: asset('textures/earth.jpg'),
+      education: asset('textures/mars.jpg'), strengths: asset('textures/saturn.jpg'),
     }
     const loadTexture = (url: string) => {
       const texture = textureLoader.load(url)
@@ -57,10 +58,10 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
       return texture
     }
     const surfaceTextures = Object.fromEntries(Object.entries(textureFiles).map(([id, url]) => [id, loadTexture(url)]))
-    const moonTexture = loadTexture('/textures/moon.jpg')
-    const earthCloudTexture = loadTexture('/textures/earth-clouds.jpg')
-    const saturnRingTexture = loadTexture('/textures/saturn-ring.png')
-    const starFieldTexture = loadTexture('/textures/stars.jpg')
+    const moonTexture = loadTexture(asset('textures/moon.jpg'))
+    const earthCloudTexture = loadTexture(asset('textures/earth-clouds.jpg'))
+    const saturnRingTexture = loadTexture(asset('textures/saturn-ring.png'))
+    const starFieldTexture = loadTexture(asset('textures/stars.jpg'))
 
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
