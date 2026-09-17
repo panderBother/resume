@@ -39,3 +39,6 @@
   .landing-copy{bottom:calc(16px + env(safe-area-inset-bottom))}.landing-copy h1{font-size:36px}.landing-copy p{font-size:13px;line-height:1.55;margin:11px 0 13px}.landing-contact{margin-top:10px}.landing-contact a{font-size:9px}
   .detail-panel{height:min(59dvh,500px)}.profile-panel{height:min(59dvh,500px)}
 }
+
+.detail-panel .entry-list{height:calc(100% - 78px);margin-top:14px;border-top:1px solid #252d36}
+@media(max-width:700px){.detail-panel .entry-list{height:calc(100% - 65px);margin-top:10px}}

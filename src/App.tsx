@@ -64,9 +64,6 @@ export default function App() {
       <button className="panel-close" onClick={closeDetail} aria-label="关闭详情并返回宇宙"><X size={18} /></button>
       <div className="section-code">{section.en} / {section.planet}</div>
       <h2>{section.label}</h2>
-      <p className="section-summary">{section.id === 'education'
-        ? `${section.entries.length} 段教育经历。教育行星保持简洁，不设置卫星。`
-        : `${section.entries.length} 颗卫星，分别对应 ${section.entries.length} 段${section.label}。`}</p>
       <div className="entry-list">
         {section.entries.map((entry, index) => <article key={`${entry.period}-${entry.role}`}>
           <div className="entry-number">{String(index + 1).padStart(2, '0')}</div>
