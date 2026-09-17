@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { sections, skills } from './data'
 
-type Props = { active: string; onSelect: (id: string) => void; onSkill: (name: string) => void }
+type Props = { active: string; interactive: boolean; onSelect: (id: string) => void; onSkill: (name: string) => void }
 
 function glowTexture(color = '#ffffff') {
   const canvas = document.createElement('canvas')
@@ -19,12 +19,14 @@ function glowTexture(color = '#ffffff') {
   return new THREE.CanvasTexture(canvas)
 }
 
-export default function SolarSystem({ active, onSelect, onSkill }: Props) {
+export default function SolarSystem({ active, interactive, onSelect, onSkill }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const activeRef = useRef(active)
+  const interactiveRef = useRef(interactive)
   const callbacks = useRef({ onSelect, onSkill })
   callbacks.current = { onSelect, onSkill }
   activeRef.current = active
+  interactiveRef.current = interactive
 
   useEffect(() => {
     const mount = host.current
@@ -45,9 +47,8 @@ export default function SolarSystem({ active, onSelect, onSkill }: Props) {
 
     const textureLoader = new THREE.TextureLoader()
     const textureFiles: Record<string, string> = {
-      profile: '/textures/sun.jpg', internship: '/textures/mercury.jpg', work: '/textures/venus.jpg',
-      projects: '/textures/earth.jpg', education: '/textures/mars.jpg', opensource: '/textures/jupiter.jpg',
-      strengths: '/textures/saturn.jpg', interests: '/textures/uranus.jpg',
+      profile: '/textures/sun.jpg', internship: '/textures/mercury.jpg', projects: '/textures/earth.jpg',
+      education: '/textures/mars.jpg', strengths: '/textures/saturn.jpg',
     }
     const loadTexture = (url: string) => {
       const texture = textureLoader.load(url)
@@ -243,12 +244,34 @@ export default function SolarSystem({ active, onSelect, onSkill }: Props) {
     }
     renderer.domElement.addEventListener('pointermove', onMove)
 
+    const tooltip = document.createElement('div')
+    tooltip.className = 'celestial-tooltip'
+    tooltip.setAttribute('role', 'tooltip')
+    tooltip.innerHTML = '<strong></strong><span>点击查看</span>'
+    mount.appendChild(tooltip)
+    let tooltipTarget: THREE.Object3D | null = null
+    const showTooltip = (object: THREE.Object3D) => {
+      if (!interactiveRef.current) return
+      tooltipTarget = object
+      tooltip.querySelector('strong')!.textContent = object.userData.label
+      tooltip.classList.add('is-visible')
+    }
+    const hideTooltip = () => {
+      tooltipTarget = null
+      tooltip.classList.remove('is-visible')
+    }
+
     const hitTargets = clickable.map((object) => {
       const button = document.createElement('button')
       button.type = 'button'
       button.className = 'celestial-hit'
       button.setAttribute('aria-label', `查看${object.userData.label}`)
+      button.addEventListener('pointerenter', () => showTooltip(object))
+      button.addEventListener('pointerleave', hideTooltip)
+      button.addEventListener('focus', () => showTooltip(object))
+      button.addEventListener('blur', hideTooltip)
       button.addEventListener('click', () => {
+        hideTooltip()
         if (object.userData.kind === 'section') callbacks.current.onSelect(object.userData.id)
         if (object.userData.kind === 'skill') callbacks.current.onSkill(object.userData.name)
       })
@@ -317,12 +340,17 @@ export default function SolarSystem({ active, onSelect, onSkill }: Props) {
         object.getWorldPosition(hitWorld)
         hitProjected.copy(hitWorld).project(camera)
         const visible = hitProjected.z >= -1 && hitProjected.z <= 1
-        button.hidden = !visible
+        button.hidden = !visible || !interactiveRef.current
         if (!visible) return
         const size = object.userData.id === 'profile' ? 86 : object.userData.kind === 'skill' ? 22 : 38
         button.style.width = `${size}px`
         button.style.height = `${size}px`
         button.style.transform = `translate(${(hitProjected.x + 1) * mount.clientWidth / 2 - size / 2}px, ${(1 - hitProjected.y) * mount.clientHeight / 2 - size / 2}px)`
+        if (tooltipTarget === object && interactiveRef.current) {
+          const x = (hitProjected.x + 1) * mount.clientWidth / 2
+          const y = (1 - hitProjected.y) * mount.clientHeight / 2
+          tooltip.style.transform = `translate(${x}px, ${y - size / 2 - 12}px)`
+        }
       })
       renderer.render(scene, camera)
       raf = requestAnimationFrame(animate)
@@ -335,6 +363,7 @@ export default function SolarSystem({ active, onSelect, onSkill }: Props) {
       window.removeEventListener('resize', onResize)
       renderer.domElement.removeEventListener('pointermove', onMove)
       hitTargets.forEach(({ button }) => button.remove())
+      tooltip.remove()
       renderer.dispose()
       renderer.domElement.remove()
     }

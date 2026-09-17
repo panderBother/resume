@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ArrowUpRight, MousePointer2, Rotate3D, X, ZoomIn } from 'lucide-react'
 import SolarSystem from './SolarSystem'
-import { profile, sections, skills } from './data'
+import { profile, sections, skillDetails, skills } from './data'
 
 export default function App() {
   const [entered, setEntered] = useState(false)
@@ -15,7 +15,7 @@ export default function App() {
 
   return <main className={entered ? 'universe-mode' : 'landing-mode'} style={{ '--accent': section?.color ?? '#ffb64c' } as React.CSSProperties}>
     <div className="space-noise" />
-    <SolarSystem active={active ?? 'overview'} onSelect={select} onSkill={(name) => entered && setSkill(name)} />
+    <SolarSystem interactive={entered} active={active ?? 'overview'} onSelect={select} onSkill={(name) => entered && setSkill(name)} />
 
     <header className="topbar">
       <button className="brand" onClick={goHome} aria-label="返回个人网站首页">
@@ -31,7 +31,12 @@ export default function App() {
       <h1>你好，我是<br/><strong>{profile.name}</strong><sup>✦</sup></h1>
       <p>{profile.intro}</p>
       <button className="enter-button" onClick={enter}>进入我的宇宙 <ArrowUpRight size={17} /></button>
-      <div className="landing-foot">{profile.location}　·　CREATIVE DEVELOPMENT</div>
+      <div className="landing-contact">
+        <a href={`tel:${profile.phone}`}>{profile.phone}</a><i />
+        <a href={`mailto:${profile.email}`}>{profile.email}</a><i />
+        <a href={profile.github} target="_blank" rel="noreferrer">GitHub · {profile.githubName}</a>
+      </div>
+      <div className="landing-foot">{profile.location}　·　{profile.intent.toUpperCase()}</div>
     </section>}
 
     {entered && active === null && !skill && <div className="universe-hint">
@@ -46,7 +51,13 @@ export default function App() {
       <h2>个人简介</h2>
       <p className="profile-role">{profile.role}</p>
       <p className="profile-intro">{profile.intro}</p>
-      <div className="profile-facts"><span>6 YEARS<br/><b>创意开发</b></span><span>12+ SKILLS<br/><b>能力星图</b></span></div>
+      <div className="profile-links">
+        <a href={`tel:${profile.phone}`}>{profile.phone}</a>
+        <a href={`mailto:${profile.email}`}>{profile.email}</a>
+        <a href={profile.github} target="_blank" rel="noreferrer">GitHub · {profile.githubName}</a>
+        <span>博客 · {profile.blog}</span>
+      </div>
+      <div className="profile-facts"><span>2027 GRADUATE<br/><b>计算机科学与技术</b></span><span>{skills.length} SKILLS<br/><b>全栈能力星图</b></span></div>
     </aside>}
 
     {entered && section && <aside className="detail-panel" aria-live="polite">
@@ -59,14 +70,17 @@ export default function App() {
       <div className="entry-list">
         {section.entries.map((entry, index) => <article key={`${entry.period}-${entry.role}`}>
           <div className="entry-number">{String(index + 1).padStart(2, '0')}</div>
-          <div><time>{entry.period}</time><h3>{entry.role}</h3><h4>{entry.org}</h4><p>{entry.desc}</p><div className="tags">{entry.tags.map((tag) => <b key={tag}>{tag}</b>)}</div></div>
+          <div><time>{entry.period}</time><h3>{entry.role}</h3><h4>{entry.org}</h4><p>{entry.desc}</p>
+            {entry.highlights && <ol className="entry-highlights">{entry.highlights.map((item) => <li key={item}>{item}</li>)}</ol>}
+            <div className="tags">{entry.tags.map((tag) => <b key={tag}>{tag}</b>)}</div>
+          </div>
         </article>)}
       </div>
     </aside>}
 
     {entered && skill && <div className="skill-card">
       <button onClick={closeDetail} aria-label="关闭技能信息"><X size={15} /></button>
-      <small>SKILL SIGNAL</small><h3>{skill}</h3><p>这颗光团代表能力图谱中的一项技能。</p>
+      <small>SKILL SIGNAL</small><h3>{skill}</h3><p>{skillDetails[skill]}</p>
       <i style={{ '--skill': skills.find((item) => item[0] === skill)?.[1] } as React.CSSProperties} />
     </div>}
 
