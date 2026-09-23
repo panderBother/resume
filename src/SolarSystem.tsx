@@ -96,7 +96,7 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
 
     const clickable: THREE.Object3D[] = []
     const objects = new Map<string, THREE.Object3D>()
-    const orbiters: { pivot: THREE.Group; speed: number; planet: THREE.Mesh; base: number }[] = []
+    const orbiters: { group: THREE.Group; speed: number; planet: THREE.Mesh; base: number; radius: number }[] = []
     const satelliteOrbiters: { pivot: THREE.Group; moon: THREE.Mesh; speed: number }[] = []
 
     const sun = new THREE.Mesh(new THREE.SphereGeometry(1.26, 72, 72), new THREE.MeshBasicMaterial({ map: surfaceTextures.profile }))
@@ -113,12 +113,13 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
       const orbitPoints = curve.getPoints(180).map((p) => new THREE.Vector3(p.x, 0, p.y))
       scene.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(orbitPoints), new THREE.LineBasicMaterial({ color: 0x8491a3, transparent: true, opacity: .16 })))
 
-      const pivot = new THREE.Group()
-      pivot.rotation.y = section.start
-      scene.add(pivot)
       const group = new THREE.Group()
-      group.position.set(section.radius, 0, 0)
-      pivot.add(group)
+      group.position.set(
+        Math.cos(section.start) * section.radius,
+        0,
+        -Math.sin(section.start) * section.radius * .72,
+      )
+      scene.add(group)
 
       const planet = new THREE.Mesh(new THREE.SphereGeometry(section.size, 64, 64), new THREE.MeshStandardMaterial({
         map: surfaceTextures[section.id], roughness: section.id === 'projects' ? .67 : .82, metalness: 0,
@@ -189,7 +190,7 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
         clickable.push(moon)
         satelliteOrbiters.push({ pivot: satellitePivot, moon, speed: .18 + index * .055 + section.speed * .25 })
       })
-      orbiters.push({ pivot, speed: section.speed, planet, base: section.start })
+      orbiters.push({ group, speed: section.speed, planet, base: section.start, radius: section.radius })
     })
 
     const skillSprites: THREE.Sprite[] = []
@@ -360,7 +361,14 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
       elapsed += frameDelta
       lastFrame = now
       orbiters.forEach((orbiter, index) => {
-        if (!reducedMotion && activeRef.current === 'overview') orbiter.pivot.rotation.y = orbiter.base + elapsed * orbiter.speed * .17
+        if (!reducedMotion && activeRef.current === 'overview') {
+          const angle = orbiter.base + elapsed * orbiter.speed * .17
+          orbiter.group.position.set(
+            Math.cos(angle) * orbiter.radius,
+            0,
+            -Math.sin(angle) * orbiter.radius * .72,
+          )
+        }
         orbiter.planet.rotation.y += .0025 + index * .0001
         const clouds = orbiter.planet.parent?.children.find((child) => child.userData.cloudLayer)
         if (clouds) clouds.rotation.y += .0031
