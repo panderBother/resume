@@ -37,7 +37,7 @@ export const profile = {
 
 export const sections: Section[] = [
   {
-    id: 'internship', label: '实习经历', en: 'INTERNSHIP', planet: '水星', color: '#b5ada1', radius: 4.2, size: .3, speed: .22, start: .2,
+    id: 'internship', label: '实习经历', en: 'INTERNSHIP', planet: '水星', color: '#b5ada1', radius: 3.25, size: .22, speed: .22, start: .18,
     entries: [
       {
         period: '2026.05 — 2026.08', org: '北京硅基流动科技有限公司 · BizyAir', role: '前端开发实习生',
@@ -62,7 +62,7 @@ export const sections: Section[] = [
     ],
   },
   {
-    id: 'projects', label: '项目经历', en: 'PROJECTS', planet: '地球', color: '#4d9fff', radius: 6.3, size: .47, speed: .13, start: 2.3,
+    id: 'projects', label: '项目经历', en: 'PROJECTS', planet: '地球', color: '#4d9fff', radius: 5.65, size: .42, speed: .13, start: 1.72,
     entries: [
       {
         period: '2026.04 — 2026.05', org: '个人与团队知识管理平台', role: 'KnowMind · 全栈开发',
@@ -87,7 +87,7 @@ export const sections: Section[] = [
     ],
   },
   {
-    id: 'education', label: '教育经历', en: 'EDUCATION', planet: '火星', color: '#d56b47', radius: 8.35, size: .36, speed: .095, start: 3.45,
+    id: 'education', label: '教育经历', en: 'EDUCATION', planet: '火星', color: '#d56b47', radius: 6.85, size: .28, speed: .095, start: 2.92,
     entries: [
       {
         period: '2023.09 — 2027.06', org: '河南科技学院', role: '计算机科学与技术 · 本科',
@@ -98,7 +98,7 @@ export const sections: Section[] = [
     ],
   },
   {
-    id: 'strengths', label: '能力与荣誉', en: 'STRENGTHS', planet: '土星', color: '#e8d39e', radius: 11.1, size: .67, speed: .055, start: 5.05,
+    id: 'strengths', label: '能力与荣誉', en: 'STRENGTHS', planet: '土星', color: '#e8d39e', radius: 9.75, size: .62, speed: .055, start: 4.72,
     entries: [
       { period: '三年工作室经历', org: '未来软件工作室', role: '前端负责人', desc: '负责前端方向学习计划、成员考核与项目进度把控，具备团队协调、技术沟通和项目推进能力。', tags: ['Team Lead', 'Mentoring', 'Delivery'] },
       { period: '校企合作实践', org: '高校 AI 赋能学生发展系统', role: '核心开发成员', desc: '参与真实校企合作项目，具备从需求理解、协作开发到完整交付的项目经验和企业级流程意识。', tags: ['AI', '全栈开发', '协作交付'] },

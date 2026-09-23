@@ -5,6 +5,17 @@ import { sections, skills } from './data'
 
 type Props = { active: string; interactive: boolean; onSelect: (id: string) => void; onSkill: (name: string) => void }
 
+type PlanetVisual = {
+  id: string
+  planet: string
+  radius: number
+  size: number
+  speed: number
+  start: number
+  order: number
+  sectionId?: string
+}
+
 function glowTexture(color = '#ffffff') {
   const canvas = document.createElement('canvas')
   canvas.width = canvas.height = 128
@@ -50,7 +61,8 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
     const asset = (path: string) => `${import.meta.env.BASE_URL}${path}`
     const textureFiles: Record<string, string> = {
       profile: asset('textures/sun.jpg'), internship: asset('textures/mercury.jpg'), projects: asset('textures/earth.jpg'),
-      education: asset('textures/mars.jpg'), strengths: asset('textures/saturn.jpg'),
+      venus: asset('textures/venus.jpg'), education: asset('textures/mars.jpg'), jupiter: asset('textures/jupiter.jpg'),
+      strengths: asset('textures/saturn.jpg'), uranus: asset('textures/uranus.jpg'), neptune: asset('textures/neptune.jpg'),
     }
     const loadTexture = (url: string) => {
       const texture = textureLoader.load(url)
@@ -99,6 +111,22 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
     const orbiters: { group: THREE.Group; speed: number; planet: THREE.Mesh; base: number; radius: number }[] = []
     const satelliteOrbiters: { pivot: THREE.Group; moon: THREE.Mesh; speed: number }[] = []
 
+    const sectionById = new Map(sections.map((section) => [section.id, section]))
+    const sectionPlanet = (id: string, order: number): PlanetVisual => {
+      const section = sectionById.get(id)!
+      return { id, planet: section.planet, radius: section.radius, size: section.size, speed: section.speed, start: section.start, order, sectionId: id }
+    }
+    const planetSystem: PlanetVisual[] = [
+      sectionPlanet('internship', 1),
+      { id: 'venus', planet: '金星', radius: 4.42, size: .34, speed: .17, start: 1.08, order: 2 },
+      sectionPlanet('projects', 3),
+      sectionPlanet('education', 4),
+      { id: 'jupiter', planet: '木星', radius: 8.18, size: .74, speed: .072, start: 2.35, order: 5 },
+      sectionPlanet('strengths', 6),
+      { id: 'uranus', planet: '天王星', radius: 11.18, size: .42, speed: .041, start: 1.45, order: 7 },
+      { id: 'neptune', planet: '海王星', radius: 12.55, size: .41, speed: .032, start: 5.55, order: 8 },
+    ]
+
     const sun = new THREE.Mesh(new THREE.SphereGeometry(1.26, 72, 72), new THREE.MeshBasicMaterial({ map: surfaceTextures.profile }))
     sun.userData = { kind: 'section', id: 'profile', label: '太阳 · 个人简介' }
     scene.add(sun)
@@ -108,38 +136,41 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
     const corona = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture('#ff9e32'), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }))
     corona.scale.set(6.4, 6.4, 1)
     scene.add(corona)
-    sections.forEach((section) => {
-      const curve = new THREE.EllipseCurve(0, 0, section.radius, section.radius * .72, 0, Math.PI * 2)
+    planetSystem.forEach((planetVisual) => {
+      const section = planetVisual.sectionId ? sectionById.get(planetVisual.sectionId) : undefined
+      const curve = new THREE.EllipseCurve(0, 0, planetVisual.radius, planetVisual.radius * .72, 0, Math.PI * 2)
       const orbitPoints = curve.getPoints(180).map((p) => new THREE.Vector3(p.x, 0, p.y))
       scene.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(orbitPoints), new THREE.LineBasicMaterial({ color: 0x8491a3, transparent: true, opacity: .16 })))
 
       const group = new THREE.Group()
       group.position.set(
-        Math.cos(section.start) * section.radius,
+        Math.cos(planetVisual.start) * planetVisual.radius,
         0,
-        -Math.sin(section.start) * section.radius * .72,
+        -Math.sin(planetVisual.start) * planetVisual.radius * .72,
       )
       scene.add(group)
 
-      const planet = new THREE.Mesh(new THREE.SphereGeometry(section.size, 64, 64), new THREE.MeshStandardMaterial({
-        map: surfaceTextures[section.id], roughness: section.id === 'projects' ? .67 : .82, metalness: 0,
+      const planet = new THREE.Mesh(new THREE.SphereGeometry(planetVisual.size, 64, 64), new THREE.MeshStandardMaterial({
+        map: surfaceTextures[planetVisual.id], roughness: planetVisual.id === 'projects' ? .67 : .82, metalness: 0,
       }))
-      planet.userData = { kind: 'section', id: section.id, label: `${section.planet} · ${section.label}` }
+      planet.userData = section
+        ? { kind: 'section', id: section.id, label: `${planetVisual.planet} · ${section.label}`, order: planetVisual.order }
+        : { kind: 'planet', id: planetVisual.id, label: planetVisual.planet, order: planetVisual.order }
       group.add(planet)
       clickable.push(planet)
-      objects.set(section.id, planet)
+      if (section) objects.set(section.id, planet)
 
-      if (section.id === 'projects') {
-        group.add(new THREE.Mesh(new THREE.SphereGeometry(section.size * 1.075, 48, 48), new THREE.MeshBasicMaterial({ color: 0x68bfff, transparent: true, opacity: .1, side: THREE.BackSide })))
-        const clouds = new THREE.Mesh(new THREE.SphereGeometry(section.size * 1.018, 64, 64), new THREE.MeshStandardMaterial({
+      if (planetVisual.id === 'projects') {
+        group.add(new THREE.Mesh(new THREE.SphereGeometry(planetVisual.size * 1.075, 48, 48), new THREE.MeshBasicMaterial({ color: 0x68bfff, transparent: true, opacity: .1, side: THREE.BackSide })))
+        const clouds = new THREE.Mesh(new THREE.SphereGeometry(planetVisual.size * 1.018, 64, 64), new THREE.MeshStandardMaterial({
           map: earthCloudTexture, alphaMap: earthCloudTexture, transparent: true, opacity: .72, depthWrite: false, roughness: 1,
         }))
         clouds.userData.cloudLayer = true
         group.add(clouds)
       }
-      if (section.id === 'strengths') {
-        const inner = section.size * 1.35
-        const outer = section.size * 2.45
+      if (planetVisual.id === 'strengths') {
+        const inner = planetVisual.size * 1.35
+        const outer = planetVisual.size * 2.45
         const ringGeometry = new THREE.RingGeometry(inner, outer, 128, 8)
         const position = ringGeometry.attributes.position
         const uv = ringGeometry.attributes.uv
@@ -152,10 +183,10 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
         group.add(ring)
       }
 
-      if (section.id !== 'education') section.entries.forEach((entry, index) => {
+      if (section && section.id !== 'education') section.entries.forEach((entry, index) => {
         const angle = (index / section.entries.length) * Math.PI * 2
-        const moonRadius = section.size * 1.9 + .26 + index * .075
-        const moonSize = Math.max(.085, Math.min(.14, section.size * .19))
+        const moonRadius = planetVisual.size * 1.9 + .26 + index * .075
+        const moonSize = Math.max(.085, Math.min(.14, planetVisual.size * .19))
         const moonOrbit = new THREE.LineLoop(
           new THREE.BufferGeometry().setFromPoints(
             new THREE.EllipseCurve(0, 0, moonRadius, moonRadius, 0, Math.PI * 2).getPoints(64).map((point) => new THREE.Vector3(point.x, 0, point.y)),
@@ -188,9 +219,9 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
         moon.userData = { kind: 'entry', sectionId: section.id, label: entryName, category: section.label, detail: entryDetail }
         satellitePivot.add(moon)
         clickable.push(moon)
-        satelliteOrbiters.push({ pivot: satellitePivot, moon, speed: .18 + index * .055 + section.speed * .25 })
+        satelliteOrbiters.push({ pivot: satellitePivot, moon, speed: .18 + index * .055 + planetVisual.speed * .25 })
       })
-      orbiters.push({ group, speed: section.speed, planet, base: section.start, radius: section.radius })
+      orbiters.push({ group, speed: planetVisual.speed, planet, base: planetVisual.start, radius: planetVisual.radius })
     })
 
     const skillSprites: THREE.Sprite[] = []
@@ -307,10 +338,14 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
         ? object.userData.category
         : object.userData.kind === 'skill'
           ? '专业技能'
+          : object.userData.kind === 'planet'
+            ? '太阳系行星'
           : object.userData.id === 'profile' ? '太阳' : '行星导航'
       tooltip.querySelector('strong')!.textContent = object.userData.label
       tooltip.querySelector('span')!.textContent = isEntry
         ? `${object.userData.detail} · 点击查看详情`
+        : object.userData.kind === 'planet'
+          ? `距太阳第 ${object.userData.order} 颗行星`
         : '点击查看'
       if (isEntry) object.scale.setScalar(1.65)
       tooltip.classList.add('is-visible')
@@ -322,18 +357,24 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
     }
 
     const hitTargets = clickable.map((object) => {
-      const button = document.createElement('button')
-      button.type = 'button'
+      const actionable = object.userData.kind !== 'planet'
+      const button = document.createElement(actionable ? 'button' : 'div') as HTMLButtonElement
+      if (actionable) button.type = 'button'
       button.className = 'celestial-hit'
       const isEntry = object.userData.kind === 'entry'
-      button.setAttribute('aria-label', isEntry ? `查看${object.userData.category}：${object.userData.label}` : `查看${object.userData.label}`)
+      const isDecorativePlanet = object.userData.kind === 'planet'
+      button.setAttribute('aria-label', isEntry ? `查看${object.userData.category}：${object.userData.label}` : isDecorativePlanet ? object.userData.label : `查看${object.userData.label}`)
       button.title = isEntry ? `${object.userData.category}：${object.userData.label}` : object.userData.label
+      if (isDecorativePlanet) {
+        button.setAttribute('role', 'img')
+        button.tabIndex = 0
+      }
       if (isEntry) button.classList.add('satellite-hit')
       button.addEventListener('pointerenter', () => showTooltip(object))
       button.addEventListener('pointerleave', hideTooltip)
       button.addEventListener('focus', () => showTooltip(object))
       button.addEventListener('blur', hideTooltip)
-      button.addEventListener('click', () => {
+      if (actionable) button.addEventListener('click', () => {
         hideTooltip()
         if (object.userData.kind === 'section') callbacks.current.onSelect(object.userData.id)
         if (object.userData.kind === 'entry') callbacks.current.onSelect(object.userData.sectionId)
@@ -398,7 +439,7 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
       if (isMobileViewport() && selectedId !== 'overview') desiredTarget.y -= 1.15
       const section = sections.find((item) => item.id === selectedId)
       const distance = selectedId === 'overview'
-        ? (isMobileViewport() ? 26 : 22)
+        ? (isMobileViewport() ? 38 : 24)
         : selectedId === 'profile'
           ? (isMobileViewport() ? 5.8 : 4.4)
           : Math.max(isMobileViewport() ? 3.2 : 2.1, (section?.size || .4) * (isMobileViewport() ? 6.6 : 5.2))
