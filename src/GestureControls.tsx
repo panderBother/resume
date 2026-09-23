@@ -49,6 +49,7 @@ export default function GestureControls() {
   const detectorRef = useRef<{ detectForVideo: (video: HTMLVideoElement, timestamp: number) => { landmarks: Landmark[][] }; close: () => void } | null>(null)
   const rafRef = useRef(0)
   const lastInferenceRef = useRef(0)
+  const detectionFailuresRef = useRef(0)
   const previousPalmRef = useRef<{ x: number; y: number } | null>(null)
   const previousPinchRef = useRef<number | null>(null)
   const [mode, setMode] = useState<GestureMode>('idle')
@@ -64,6 +65,7 @@ export default function GestureControls() {
     detectorRef.current = null
     previousPalmRef.current = null
     previousPinchRef.current = null
+    detectionFailuresRef.current = 0
     if (canvasRef.current) drawHand(canvasRef.current)
     setMode('idle')
     setOpen(false)
@@ -133,12 +135,21 @@ export default function GestureControls() {
         lastInferenceRef.current = now
         try {
           const result = detector.detectForVideo(video, now)
+          detectionFailuresRef.current = 0
           const hand = result.landmarks[0]
           processHand(hand)
           if (canvasRef.current) drawHand(canvasRef.current, hand)
         } catch {
-          setError('手势识别暂时中断，请关闭后重试')
-          setMode('error')
+          detectionFailuresRef.current += 1
+          if (detectionFailuresRef.current >= 3) {
+            streamRef.current?.getTracks().forEach((track) => track.stop())
+            detectorRef.current?.close()
+            streamRef.current = null
+            detectorRef.current = null
+            setError('手势识别暂时中断，请重新开启摄像头')
+            setMode('error')
+            return
+          }
         }
       }
       rafRef.current = requestAnimationFrame(tick)
@@ -173,7 +184,6 @@ export default function GestureControls() {
       const options = {
         baseOptions: {
           modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
-          delegate: 'GPU' as const,
         },
         runningMode: 'VIDEO' as const,
         numHands: 1,
@@ -181,14 +191,7 @@ export default function GestureControls() {
         minHandPresenceConfidence: .5,
         minTrackingConfidence: .5,
       }
-      try {
-        detectorRef.current = await HandLandmarker.createFromOptions(vision, options)
-      } catch {
-        detectorRef.current = await HandLandmarker.createFromOptions(vision, {
-          ...options,
-          baseOptions: { ...options.baseOptions, delegate: 'CPU' },
-        })
-      }
+      detectorRef.current = await HandLandmarker.createFromOptions(vision, options)
       setMode('seeking')
       startLoop()
     } catch (reason) {
@@ -216,7 +219,7 @@ export default function GestureControls() {
       </button>
       <button type="button" className="gesture-stop" onClick={stop} aria-label="关闭摄像头手势控制"><X size={14} /></button>
     </div>}
-    {open && !minimized && <section className="gesture-panel" aria-live="polite">
+    {open && <section className={`gesture-panel ${minimized ? 'is-minimized' : ''}`} aria-live="polite" aria-hidden={minimized}>
       <header>
         <span><i /> CAMERA GESTURE</span>
         <div>
