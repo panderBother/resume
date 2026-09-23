@@ -63,6 +63,8 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
     const earthCloudTexture = loadTexture(asset('textures/earth-clouds.jpg'))
     const saturnRingTexture = loadTexture(asset('textures/saturn-ring.png'))
     const starFieldTexture = loadTexture(asset('textures/stars.jpg'))
+    const moonBumpTexture = textureLoader.load(asset('textures/moon.jpg'))
+    moonBumpTexture.anisotropy = renderer.capabilities.getMaxAnisotropy()
 
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
@@ -84,6 +86,7 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
     const clickable: THREE.Object3D[] = []
     const objects = new Map<string, THREE.Object3D>()
     const orbiters: { pivot: THREE.Group; speed: number; planet: THREE.Mesh; base: number }[] = []
+    const satelliteOrbiters: { pivot: THREE.Group; moon: THREE.Mesh; speed: number }[] = []
 
     const sun = new THREE.Mesh(new THREE.SphereGeometry(1.26, 72, 72), new THREE.MeshBasicMaterial({ map: surfaceTextures.profile }))
     sun.userData = { kind: 'section', id: 'profile', label: '太阳 · 个人简介' }
@@ -140,16 +143,40 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
       if (section.id !== 'education') section.entries.forEach((entry, index) => {
         const angle = (index / section.entries.length) * Math.PI * 2
         const moonRadius = section.size * 1.9 + .26 + index * .075
-        const moon = new THREE.Mesh(new THREE.SphereGeometry(.066, 18, 18), new THREE.MeshStandardMaterial({ map: moonTexture, roughness: .9 }))
-        moon.position.set(Math.cos(angle) * moonRadius, Math.sin(angle * 1.7) * .12, Math.sin(angle) * moonRadius)
+        const moonSize = Math.max(.085, Math.min(.14, section.size * .19))
+        const moonOrbit = new THREE.LineLoop(
+          new THREE.BufferGeometry().setFromPoints(
+            new THREE.EllipseCurve(0, 0, moonRadius, moonRadius, 0, Math.PI * 2).getPoints(64).map((point) => new THREE.Vector3(point.x, 0, point.y)),
+          ),
+          new THREE.LineBasicMaterial({ color: 0xaeb7c2, transparent: true, opacity: .12 }),
+        )
+        group.add(moonOrbit)
+
+        const satellitePivot = new THREE.Group()
+        satellitePivot.rotation.y = angle
+        satellitePivot.rotation.z = (index % 2 ? 1 : -1) * (.035 + index * .012)
+        group.add(satellitePivot)
+        const moon = new THREE.Mesh(new THREE.SphereGeometry(moonSize, 32, 32), new THREE.MeshStandardMaterial({
+          map: moonTexture,
+          bumpMap: moonBumpTexture,
+          bumpScale: moonSize * .16,
+          roughness: .94,
+          metalness: 0,
+        }))
+        moon.position.set(moonRadius, 0, 0)
+        moon.rotation.set(index * .7, index * 1.3, index * .35)
         const entryName = section.id === 'internship'
           ? entry.org.split(' · ')[0]
           : section.id === 'projects'
             ? entry.role.split(' · ')[0]
             : entry.role
-        moon.userData = { kind: 'entry', sectionId: section.id, label: entryName, category: section.label }
-        group.add(moon)
+        const entryDetail = section.id === 'projects'
+          ? entry.role.split(' · ')[1] || entry.org
+          : entry.role
+        moon.userData = { kind: 'entry', sectionId: section.id, label: entryName, category: section.label, detail: entryDetail }
+        satellitePivot.add(moon)
         clickable.push(moon)
+        satelliteOrbiters.push({ pivot: satellitePivot, moon, speed: .18 + index * .055 + section.speed * .25 })
       })
       orbiters.push({ pivot, speed: section.speed, planet, base: section.start })
     })
@@ -256,19 +283,28 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
     const tooltip = document.createElement('div')
     tooltip.className = 'celestial-tooltip'
     tooltip.setAttribute('role', 'tooltip')
-    tooltip.innerHTML = '<strong></strong><span>点击查看</span>'
+    tooltip.innerHTML = '<small></small><strong></strong><span></span>'
     mount.appendChild(tooltip)
     let tooltipTarget: THREE.Object3D | null = null
     const showTooltip = (object: THREE.Object3D) => {
       if (!interactiveRef.current) return
+      if (tooltipTarget?.userData.kind === 'entry' && tooltipTarget !== object) tooltipTarget.scale.setScalar(1)
       tooltipTarget = object
+      const isEntry = object.userData.kind === 'entry'
+      tooltip.querySelector('small')!.textContent = isEntry
+        ? object.userData.category
+        : object.userData.kind === 'skill'
+          ? '专业技能'
+          : object.userData.id === 'profile' ? '太阳' : '行星导航'
       tooltip.querySelector('strong')!.textContent = object.userData.label
-      tooltip.querySelector('span')!.textContent = object.userData.kind === 'entry'
-        ? `卫星 · ${object.userData.category} · 点击查看`
+      tooltip.querySelector('span')!.textContent = isEntry
+        ? `${object.userData.detail} · 点击查看详情`
         : '点击查看'
+      if (isEntry) object.scale.setScalar(1.65)
       tooltip.classList.add('is-visible')
     }
     const hideTooltip = () => {
+      if (tooltipTarget?.userData.kind === 'entry') tooltipTarget.scale.setScalar(1)
       tooltipTarget = null
       tooltip.classList.remove('is-visible')
     }
@@ -277,8 +313,10 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
       const button = document.createElement('button')
       button.type = 'button'
       button.className = 'celestial-hit'
-      button.setAttribute('aria-label', `查看${object.userData.label}`)
-      if (object.userData.kind === 'entry') button.classList.add('satellite-hit')
+      const isEntry = object.userData.kind === 'entry'
+      button.setAttribute('aria-label', isEntry ? `查看${object.userData.category}：${object.userData.label}` : `查看${object.userData.label}`)
+      button.title = isEntry ? `${object.userData.category}：${object.userData.label}` : object.userData.label
+      if (isEntry) button.classList.add('satellite-hit')
       button.addEventListener('pointerenter', () => showTooltip(object))
       button.addEventListener('pointerleave', hideTooltip)
       button.addEventListener('focus', () => showTooltip(object))
@@ -307,13 +345,18 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
     let elapsed = 0
     let raf = 0
     const animate = (now = performance.now()) => {
-      elapsed += Math.min((now - lastFrame) / 1000, .05)
+      const frameDelta = Math.min((now - lastFrame) / 1000, .05)
+      elapsed += frameDelta
       lastFrame = now
       orbiters.forEach((orbiter, index) => {
         if (!reducedMotion && activeRef.current === 'overview') orbiter.pivot.rotation.y = orbiter.base + elapsed * orbiter.speed * .17
         orbiter.planet.rotation.y += .0025 + index * .0001
         const clouds = orbiter.planet.parent?.children.find((child) => child.userData.cloudLayer)
         if (clouds) clouds.rotation.y += .0031
+      })
+      satelliteOrbiters.forEach(({ pivot, moon, speed }, index) => {
+        if (!reducedMotion && tooltipTarget !== moon) pivot.rotation.y += frameDelta * speed
+        if (!reducedMotion) moon.rotation.y += frameDelta * (.12 + index * .008)
       })
       if (!reducedMotion) {
         corona.material.rotation = elapsed * .03
@@ -368,7 +411,7 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
           : object.userData.kind === 'skill'
             ? (coarsePointer ? 38 : 22)
             : object.userData.kind === 'entry'
-              ? (coarsePointer ? 46 : 30)
+              ? (coarsePointer ? 48 : 38)
               : (coarsePointer ? 54 : 38)
         button.style.width = `${size}px`
         button.style.height = `${size}px`
