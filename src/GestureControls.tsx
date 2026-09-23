@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { Camera, CameraOff, Hand, LoaderCircle, Minimize2, MoveHorizontal, Rotate3D, X } from 'lucide-react'
+import { Camera, CameraOff, Hand, LoaderCircle, Minus, Minimize2, Plus, Rotate3D, X } from 'lucide-react'
 
 type GestureMode = 'idle' | 'loading' | 'seeking' | 'rotate' | 'zoom' | 'error'
 type Landmark = { x: number; y: number; z: number }
-type Point = Pick<Landmark, 'x' | 'y'>
 
 const HAND_CONNECTIONS: [number, number][] = [
   [0, 1], [1, 2], [2, 3], [3, 4],
@@ -13,36 +12,34 @@ const HAND_CONNECTIONS: [number, number][] = [
   [13, 17], [17, 18], [18, 19], [19, 20], [0, 17],
 ]
 
-const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y)
+const distance = (a: Landmark, b: Landmark) => Math.hypot(a.x - b.x, a.y - b.y)
 const averagePoint = (landmarks: Landmark[], indexes: number[]) => indexes.reduce(
   (point, index) => ({ x: point.x + landmarks[index].x / indexes.length, y: point.y + landmarks[index].y / indexes.length }),
   { x: 0, y: 0 },
 )
 
-function drawHands(canvas: HTMLCanvasElement, hands: Landmark[][] = []) {
+function drawHand(canvas: HTMLCanvasElement, landmarks?: Landmark[]) {
   const context = canvas.getContext('2d')
   if (!context) return
   context.clearRect(0, 0, canvas.width, canvas.height)
-  hands.forEach((landmarks, handIndex) => {
-    const color = handIndex === 0 ? '#ffb64c' : '#a9d9ff'
-    context.save()
-    context.strokeStyle = handIndex === 0 ? 'rgba(255, 190, 92, .72)' : 'rgba(169, 217, 255, .72)'
-    context.lineWidth = 2
-    context.lineCap = 'round'
-    HAND_CONNECTIONS.forEach(([from, to]) => {
-      context.beginPath()
-      context.moveTo((1 - landmarks[from].x) * canvas.width, landmarks[from].y * canvas.height)
-      context.lineTo((1 - landmarks[to].x) * canvas.width, landmarks[to].y * canvas.height)
-      context.stroke()
-    })
-    landmarks.forEach((landmark, index) => {
-      context.beginPath()
-      context.fillStyle = index === 0 || index === 9 ? '#f7f1e5' : color
-      context.arc((1 - landmark.x) * canvas.width, landmark.y * canvas.height, index === 0 || index === 9 ? 3.6 : 2.2, 0, Math.PI * 2)
-      context.fill()
-    })
-    context.restore()
+  if (!landmarks) return
+  context.save()
+  context.strokeStyle = 'rgba(255, 190, 92, .72)'
+  context.lineWidth = 2
+  context.lineCap = 'round'
+  HAND_CONNECTIONS.forEach(([from, to]) => {
+    context.beginPath()
+    context.moveTo((1 - landmarks[from].x) * canvas.width, landmarks[from].y * canvas.height)
+    context.lineTo((1 - landmarks[to].x) * canvas.width, landmarks[to].y * canvas.height)
+    context.stroke()
   })
+  landmarks.forEach((landmark, index) => {
+    context.beginPath()
+    context.fillStyle = index === 4 || index === 8 ? '#fff1d2' : '#ffb64c'
+    context.arc((1 - landmark.x) * canvas.width, landmark.y * canvas.height, index === 4 || index === 8 ? 3.8 : 2.2, 0, Math.PI * 2)
+    context.fill()
+  })
+  context.restore()
 }
 
 export default function GestureControls() {
@@ -54,7 +51,7 @@ export default function GestureControls() {
   const lastInferenceRef = useRef(0)
   const detectionFailuresRef = useRef(0)
   const previousPalmRef = useRef<{ x: number; y: number } | null>(null)
-  const previousTwoHandSpanRef = useRef<number | null>(null)
+  const previousPinchRef = useRef<number | null>(null)
   const [mode, setMode] = useState<GestureMode>('idle')
   const [open, setOpen] = useState(false)
   const [minimized, setMinimized] = useState(false)
@@ -67,9 +64,9 @@ export default function GestureControls() {
     streamRef.current = null
     detectorRef.current = null
     previousPalmRef.current = null
-    previousTwoHandSpanRef.current = null
+    previousPinchRef.current = null
     detectionFailuresRef.current = 0
-    if (canvasRef.current) drawHands(canvasRef.current)
+    if (canvasRef.current) drawHand(canvasRef.current)
     setMode('idle')
     setOpen(false)
     setMinimized(false)
@@ -86,47 +83,48 @@ export default function GestureControls() {
     window.dispatchEvent(new CustomEvent('solar-gesture', { detail: { rotateX, rotateY, zoom } }))
   }
 
-  const processHands = (hands: Landmark[][]) => {
-    if (hands.length === 0) {
+  const processHand = (landmarks?: Landmark[]) => {
+    if (!landmarks) {
       previousPalmRef.current = null
-      previousTwoHandSpanRef.current = null
+      previousPinchRef.current = null
       setMode('seeking')
       return
     }
 
-    if (hands.length >= 2) {
-      const [firstHand, secondHand] = hands
-      const firstPalm = averagePoint(firstHand, [0, 5, 9, 13, 17])
-      const secondPalm = averagePoint(secondHand, [0, 5, 9, 13, 17])
-      const averagePalmWidth = Math.max((distance(firstHand[5], firstHand[17]) + distance(secondHand[5], secondHand[17])) / 2, .04)
-      const measuredSpan = distance(firstPalm, secondPalm) / averagePalmWidth
-      const previousSpan = previousTwoHandSpanRef.current
-      const smoothedSpan = previousSpan === null ? measuredSpan : previousSpan * .64 + measuredSpan * .36
-      if (previousSpan !== null) {
-        const spanDelta = smoothedSpan - previousSpan
-        if (Math.abs(spanDelta) > .015) {
-          const zoomDelta = Math.max(-.018, Math.min(.018, spanDelta * .12))
-          emitGesture(0, 0, zoomDelta)
-        }
+    const palmWidth = Math.max(distance(landmarks[5], landmarks[17]), .04)
+    const pinch = distance(landmarks[4], landmarks[8]) / palmWidth
+    const palm = averagePoint(landmarks, [0, 5, 9, 13, 17])
+    const mirroredPalm = { x: 1 - palm.x, y: palm.y }
+    const extendedFingers = [[8, 6], [12, 10], [16, 14], [20, 18]].filter(([tip, joint]) => (
+      distance(landmarks[tip], landmarks[0]) > distance(landmarks[joint], landmarks[0]) * 1.12
+    )).length
+
+    if (pinch < .72) {
+      const previousPinch = previousPinchRef.current
+      if (previousPinch !== null) {
+        const zoomDelta = Math.max(-.055, Math.min(.055, pinch - previousPinch))
+        if (Math.abs(zoomDelta) > .003) emitGesture(0, 0, zoomDelta)
       }
-      previousTwoHandSpanRef.current = smoothedSpan
-      previousPalmRef.current = null
+      previousPinchRef.current = pinch
+      previousPalmRef.current = mirroredPalm
       setMode('zoom')
       return
     }
 
-    previousTwoHandSpanRef.current = null
-    const landmarks = hands[0]
-    const palm = averagePoint(landmarks, [0, 5, 9, 13, 17])
-    const mirroredPalm = { x: 1 - palm.x, y: palm.y }
-    const previousPalm = previousPalmRef.current
-    if (previousPalm) {
-      const rotateX = Math.max(-.032, Math.min(.032, mirroredPalm.x - previousPalm.x))
-      const rotateY = Math.max(-.032, Math.min(.032, mirroredPalm.y - previousPalm.y))
-      if (Math.abs(rotateX) + Math.abs(rotateY) > .0025) emitGesture(rotateX, rotateY, 0)
+    previousPinchRef.current = null
+    if (extendedFingers >= 3) {
+      const previousPalm = previousPalmRef.current
+      if (previousPalm) {
+        const rotateX = Math.max(-.035, Math.min(.035, mirroredPalm.x - previousPalm.x))
+        const rotateY = Math.max(-.035, Math.min(.035, mirroredPalm.y - previousPalm.y))
+        if (Math.abs(rotateX) + Math.abs(rotateY) > .0025) emitGesture(rotateX, rotateY, 0)
+      }
+      previousPalmRef.current = mirroredPalm
+      setMode('rotate')
+    } else {
+      previousPalmRef.current = mirroredPalm
+      setMode('seeking')
     }
-    previousPalmRef.current = mirroredPalm
-    setMode('rotate')
   }
 
   const startLoop = () => {
@@ -138,9 +136,9 @@ export default function GestureControls() {
         try {
           const result = detector.detectForVideo(video, now)
           detectionFailuresRef.current = 0
-          const hands = result.landmarks.slice(0, 2)
-          processHands(hands)
-          if (canvasRef.current) drawHands(canvasRef.current, hands)
+          const hand = result.landmarks[0]
+          processHand(hand)
+          if (canvasRef.current) drawHand(canvasRef.current, hand)
         } catch {
           detectionFailuresRef.current += 1
           if (detectionFailuresRef.current >= 3) {
@@ -188,7 +186,7 @@ export default function GestureControls() {
           modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
         },
         runningMode: 'VIDEO' as const,
-        numHands: 2,
+        numHands: 1,
         minHandDetectionConfidence: .55,
         minHandPresenceConfidence: .5,
         minTrackingConfidence: .5,
@@ -210,7 +208,7 @@ export default function GestureControls() {
   }
 
   const labels: Record<GestureMode, string> = {
-    idle: '手势操控', loading: '正在启动', seeking: '请举起一只或两只手', rotate: '单手移动视角', zoom: '双手伸合缩放', error: '启动失败',
+    idle: '手势操控', loading: '正在启动', seeking: '请举起一只手', rotate: '手掌旋转中', zoom: '捏合缩放中', error: '启动失败',
   }
   const active = mode !== 'idle' && mode !== 'error'
 
@@ -237,8 +235,8 @@ export default function GestureControls() {
       </div>
       <div className="gesture-readout"><i className={`mode-${mode}`} /><strong>{labels[mode]}</strong><span>画面仅在本机处理</span></div>
       {mode !== 'error' && <div className="gesture-guide">
-        <span><Rotate3D size={14} />单手移动<small>旋转查看</small></span>
-        <span><Hand size={13} /><MoveHorizontal size={12} /><Hand size={13} />双手伸合<small>放大缩小</small></span>
+        <span><Rotate3D size={14} />张开手掌移动<small>旋转查看</small></span>
+        <span><Hand size={14} /><Minus size={9} /><Plus size={9} />拇指食指捏合<small>放大缩小</small></span>
       </div>}
       {mode === 'error' && <button className="gesture-retry" type="button" onClick={start}>重新尝试</button>}
     </section>}
