@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ArrowUpRight, MousePointer2, Rotate3D, X, ZoomIn } from 'lucide-react'
 import SolarSystem from './SolarSystem'
+import GestureControls from './GestureControls'
 import { profile, sections, skillDetails, skills } from './data'
 
 export default function App() {
@@ -44,6 +45,8 @@ export default function App() {
       <span><ZoomIn size={15} />滚轮缩放</span>
       <span><MousePointer2 size={14} />点击天体</span>
     </div>}
+
+    {entered && <GestureControls />}
 
     {entered && active === 'profile' && <aside className="detail-panel profile-panel" aria-live="polite">
       <button className="panel-close" onClick={closeDetail} aria-label="关闭个人简介"><X size={18} /></button>

@@ -79,6 +79,17 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
     controls.target.set(0, 0, 0)
     controls.update()
 
+    let gestureRotateX = 0
+    let gestureRotateY = 0
+    let gestureZoom = 0
+    const onGesture = (event: Event) => {
+      const { rotateX = 0, rotateY = 0, zoom = 0 } = (event as CustomEvent<{ rotateX: number; rotateY: number; zoom: number }>).detail || {}
+      gestureRotateX += rotateX
+      gestureRotateY += rotateY
+      gestureZoom += zoom
+    }
+    window.addEventListener('solar-gesture', onGesture)
+
     scene.add(new THREE.AmbientLight(0x6b7895, .3))
     scene.add(new THREE.HemisphereLight(0x6177a0, 0x08090d, .34))
     scene.add(new THREE.PointLight(0xffc465, 62, 54, 1.6))
@@ -397,6 +408,18 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
         controls.target.copy(desiredTarget)
         previousTarget.copy(desiredTarget)
       }
+
+      if (Math.abs(gestureRotateX) + Math.abs(gestureRotateY) + Math.abs(gestureZoom) > .0001) {
+        const cameraOffset = camera.position.clone().sub(controls.target)
+        const spherical = new THREE.Spherical().setFromVector3(cameraOffset)
+        spherical.theta -= gestureRotateX * 2.35
+        spherical.phi = THREE.MathUtils.clamp(spherical.phi + gestureRotateY * 1.9, controls.minPolarAngle, controls.maxPolarAngle)
+        spherical.radius = THREE.MathUtils.clamp(spherical.radius * Math.exp(-gestureZoom * 4.8), controls.minDistance, controls.maxDistance)
+        camera.position.copy(controls.target).add(cameraOffset.setFromSpherical(spherical))
+        gestureRotateX *= .58
+        gestureRotateY *= .58
+        gestureZoom *= .5
+      }
       controls.update()
       const hitWorld = new THREE.Vector3()
       const hitProjected = new THREE.Vector3()
@@ -430,6 +453,7 @@ export default function SolarSystem({ active, interactive, onSelect, onSkill }: 
     return () => {
       cancelAnimationFrame(raf)
       controls.dispose()
+      window.removeEventListener('solar-gesture', onGesture)
       window.removeEventListener('resize', onResize)
       renderer.domElement.removeEventListener('pointermove', onMove)
       hitTargets.forEach(({ button }) => button.remove())
